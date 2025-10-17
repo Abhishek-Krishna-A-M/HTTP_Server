@@ -1,24 +1,24 @@
-#ifndef Server_h
-#define Server_h
+#ifndef SERVER_H
+#define SERVER_H
 
 #include <sys/socket.h>
-#include<netinet/in.h>
+#include <netinet/in.h>
 
-
-struct Server{
+struct Server {
+    int socket;
     int domain;
-    int protocol;
     int service;
+    int protocol;
     u_long interface;
     int port;
-    int backog;
+    int backlog;
 
-    struct sockaadr_in address;
+    struct sockaddr_in address;
 
-    void (*launch)(void);
+    void (*launch)(struct Server *server);
 };
 
-struct Server server_constructor(int domain,int service,int protocol,u_long interface,int port,int backlog,
-                                 void (*launch)(void));
+struct Server server_constructor(int domain, int service, int protocol, u_long interface, int port, int backlog,
+                                 void (*launch)(struct Server *server));
 
 #endif
