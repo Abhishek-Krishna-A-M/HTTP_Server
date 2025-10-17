@@ -5,5 +5,8 @@
 
 void launch_server(struct Server *server);
 
+
+void* handle_client(void* arg);
+
 #endif
 

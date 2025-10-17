@@ -1,30 +1,38 @@
-#include "Server.h"
+#include "../include/Request.h"
+#include "../include/Response.h"
+#include "../include/Launch.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <arpa/inet.h>
+
+#define BUFFER_SIZE 2048
 
 void* handle_client(void* arg) {
-    int client_socket = *(int*)arg;
-    free(arg);
+    int client_socket = *(int*)arg;  // Declare client_socket at the top
+    free(arg);                        // free memory allocated for client socket
 
-    char buffer[1024];
+    char buffer[BUFFER_SIZE];         // Declare buffer here
     int read_size = read(client_socket, buffer, sizeof(buffer) - 1);
 
     if (read_size > 0) {
         buffer[read_size] = '\0';
-        printf("Request:\n%s\n", buffer);
 
-        char *response =
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "Content-Length: 38\r\n\r\n"
-            "<html><body><h1>Hello from C!</h1></body></html>";
-        write(client_socket, response, strlen(response));
+        // Parse the HTTP request
+        struct HttpRequest request = parse_request(buffer);  // Declare request here
+
+        printf("Received request:\n");
+        printf("Method: %s, Path: %s\n", request.method, request.path);
+
+        // Serve the requested file
+        serve_response(client_socket, &request, "www", true);
     }
+
     close(client_socket);
     printf("Client disconnected\n");
+
     return NULL;
 }
 
@@ -37,11 +45,14 @@ void launch_server(struct Server *server) {
             continue;
         }
 
+        printf("Client Connected!\n");
+
+
         // Handle each client in a separate thread
         pthread_t thread_id;
         int *pclient = malloc(sizeof(int));
         *pclient = client_socket;
-        pthread_create(&thread_id, NULL, (void *(*)(void *))handle_client, pclient);
+        pthread_create(&thread_id, NULL,handle_client, pclient);
         pthread_detach(thread_id);
     }
 }
