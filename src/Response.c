@@ -5,7 +5,35 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
+// Send HTTP response (always HTTP/1.1)
+void send_response(int client_socket, int status, const char* type, const char* body, size_t length) {
+    char header[512];
+    int header_len = snprintf(header, sizeof(header),
+        "HTTP/1.1 %d OK\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %zu\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "X-Powered-By: C HTTP Server\r\n"
+        "\r\n",
+        status, type, length);
+    write(client_socket, header, header_len);
+    if (body && length > 0) write(client_socket, body, length);
+}
+
+// Handle API requests
+void handle_api_request(int client_socket, struct HttpRequest* request) {
+    if (strcmp(request->path, "/api/hello") == 0) {
+        const char* msg = "{\"message\":\"Hello from C server!\"}";
+        send_response(client_socket, 200, "application/json", msg, strlen(msg));
+    } else {
+        const char* msg = "{\"error\":\"Not Found\"}";
+        send_response(client_socket, 404, "application/json", msg, strlen(msg));
+    }
+}
+
+// Serve static files with SPA fallback
 void serve_response(int client_socket, struct HttpRequest* request, const char* www_root, bool spa_mode) {
     char path[512];
     if (strcmp(request->path, "/") == 0) {
@@ -20,43 +48,21 @@ void serve_response(int client_socket, struct HttpRequest* request, const char* 
     }
 
     if (!file_exists(path)) {
-        char *not_found =
-            "HTTP/1.1 404 Not Found\r\n"
-            "Content-Type: text/html\r\n"
-            "Content-Length: 45\r\n\r\n"
-            "<html><body><h1>404 Not Found</h1></body></html>";
-        write(client_socket, not_found, strlen(not_found));
+        const char* msg = "<html><body><h1>404 Not Found</h1></body></html>";
+        send_response(client_socket, 404, "text/html", msg, strlen(msg));
         return;
     }
 
-    // Read file
     char* buffer;
     size_t size = read_file(path, &buffer);
     if (size == 0) {
-        char *error500 =
-            "HTTP/1.1 500 Internal Server Error\r\n"
-            "Content-Type: text/html\r\n"
-            "Content-Length: 57\r\n\r\n"
-            "<html><body><h1>500 Internal Server Error</h1></body></html>";
-        write(client_socket, error500, strlen(error500));
+        const char* msg = "<html><body><h1>500 Internal Server Error</h1></body></html>";
+        send_response(client_socket, 500, "text/html", msg, strlen(msg));
         return;
     }
 
-    // Send HTTP headers
-    const char* mime = get_mime_type(path);
-    char header[256];
-    int header_len = snprintf(header, sizeof(header),
-        "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %zu\r\n\r\n",
-        mime, size);
-    write(client_socket, header, header_len);
+    send_response(client_socket, 200, get_mime_type(path), buffer, size);
 
-    int status_code = 200; // default
-if (!file_exists(path)) status_code = 404;
-    log_request("127.0.0.1", request->method, request->path, status_code);
-
-
-    // Send file content
-    write(client_socket, buffer, size);
+    log_request("127.0.0.1", request->method, request->path, 200);
     free(buffer);
 }
-

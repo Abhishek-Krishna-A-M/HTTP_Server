@@ -15,6 +15,8 @@ struct Header {
 struct HttpRequest {
     char method[MAX_METHOD_LEN];   // GET, POST, etc.
     char path[MAX_PATH_LEN];       // URL path requested
+    char host[MAX_PATH_LEN];
+    char http_version[16];
     int header_count;              // Number of headers
     struct Header headers[MAX_HEADERS];
 };

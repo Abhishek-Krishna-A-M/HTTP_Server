@@ -1,0 +1,10 @@
+{
+  "port": 8080,
+  "spa_mode": true,
+  "remote_access": false,
+  "sites": [
+    { "host": "localhost", "root": "www" },
+    { "host": "site2.local", "root": "site2" }
+  ]
+}
+

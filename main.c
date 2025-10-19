@@ -1,24 +1,41 @@
-#include "include/Server.h"
-#include "include/Launch.h"
+#include "./include/Server.h"
+#include "./include/Launch.h"
+#include "./include/Config.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-int main(int argc, char* argv[]) {
-    int port = 8080;
-    char www_root[256] = "www";
+int main() {
+    struct Server server;
 
-    if (argc >= 2) port = atoi(argv[1]);
-    if (argc >= 3) strncpy(www_root, argv[2], sizeof(www_root));
+    // Load config
+    struct ServerConfig config = load_config("server.json");
 
-    printf("Server starting on port %d, www root: %s\n", port, www_root);
+    // Initialize server
+    server.port = config.port;
+    server.config = &config;
+    server.domain = AF_INET;
+    server.service = SOCK_STREAM;
+    server.protocol = 0;
+    server.interface = INADDR_ANY;
+    server.backlog = 10;
+    server.launch = launch_server;
 
-    struct Server server = server_constructor(
-        AF_INET, SOCK_STREAM, 0,
-        INADDR_ANY, port, 10,
-        launch_server
-    );
+    server.socket = socket(server.domain, server.service, server.protocol);
+    if (server.socket < 0) { perror("Socket failed"); return 1; }
 
+    server.address.sin_family = server.domain;
+    server.address.sin_port = htons(server.port);
+    server.address.sin_addr.s_addr = htonl(server.interface);
+
+    if (bind(server.socket, (struct sockaddr*)&server.address, sizeof(server.address)) < 0) {
+        perror("Bind failed"); return 1;
+    }
+
+    if (listen(server.socket, server.backlog) < 0) {
+        perror("Listen failed"); return 1;
+    }
+
+    // Launch server
     server.launch(&server);
 
     return 0;
