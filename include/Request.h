@@ -7,21 +7,20 @@
 #define MAX_VALUE_LEN 1024
 
 struct Header {
-    char key[MAX_METHOD_LEN];
+    char key[64];
     char value[MAX_VALUE_LEN];
 };
 
-
 struct HttpRequest {
-    char method[MAX_METHOD_LEN];   // GET, POST, etc.
-    char path[MAX_PATH_LEN];       // URL path requested
-    char host[MAX_PATH_LEN];
-    char http_version[16];
-    int header_count;              // Number of headers
+    char method[MAX_METHOD_LEN];
+    char path[MAX_PATH_LEN];
+    char host[512];
+    char http_version[32];
+    int header_count;
     struct Header headers[MAX_HEADERS];
+    char body[4096];
 };
 
 struct HttpRequest parse_request(const char* request_str);
-
 
 #endif

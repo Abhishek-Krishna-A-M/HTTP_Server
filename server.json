@@ -1,10 +1,9 @@
 {
   "port": 8080,
-  "spa_mode": true,
-  "remote_access": false,
   "sites": [
-    { "host": "localhost", "root": "www" },
-    { "host": "site2.local", "root": "site2" }
+    { "host": "localhost", "root": "www", "spa": true }
+  ],
+  "api_routes": [
+    { "path": "/api/hello", "method": "GET", "response": "{\"message\":\"Hello from C server\"}" }
   ]
 }
-

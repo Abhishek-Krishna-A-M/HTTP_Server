@@ -1,13 +1,13 @@
 #include "../include/Headers.h"
-#include <unistd.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
-void add_cors_and_custom_headers(int client_socket) {
-    char headers[256];
-    snprintf(headers, sizeof(headers),
+void add_common_headers(char* buf, size_t buf_len) {
+    // caller should append this to the response headers before final CRLFCRLF
+    // This function fills the buffer with additional header lines.
+    snprintf(buf, buf_len,
         "Access-Control-Allow-Origin: *\r\n"
-        "X-Powered-By: C HTTP Server\r\n");
-    write(client_socket, headers, strlen(headers));
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+        "Access-Control-Allow-Headers: Content-Type\r\n"
+        "X-Powered-By: Custom-C-HTTP-Server\r\n");
 }
-

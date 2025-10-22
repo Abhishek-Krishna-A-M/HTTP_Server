@@ -1,42 +1,30 @@
-#include "./include/Server.h"
-#include "./include/Launch.h"
-#include "./include/Config.h"
+#include "include/Server.h"
+#include "include/Config.h"
+#include "include/Launch.h"
+#include "include/HotReload.h"
+#include "include/CLI.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <signal.h>
 
-int main() {
-    struct Server server;
+int main(int argc, char* argv[]) {
+    char config_path[512] = "server.json";
+    int port = 0;
+    int hotreload = 0;
 
-    // Load config
-    struct ServerConfig config = load_config("server.json");
+    parse_cli_args(argc, argv, config_path, &port, &hotreload);
 
-    // Initialize server
-    server.port = config.port;
-    server.config = &config;
-    server.domain = AF_INET;
-    server.service = SOCK_STREAM;
-    server.protocol = 0;
-    server.interface = INADDR_ANY;
-    server.backlog = 10;
-    server.launch = launch_server;
+    struct ServerConfig config = load_config(config_path);
+    if (port==0) port = config.default_port;
+    config.default_port = port;
 
-    server.socket = socket(server.domain, server.service, server.protocol);
-    if (server.socket < 0) { perror("Socket failed"); return 1; }
+    struct Server server = server_constructor(port, 128, &config);
 
-    server.address.sin_family = server.domain;
-    server.address.sin_port = htons(server.port);
-    server.address.sin_addr.s_addr = htonl(server.interface);
+    if (hotreload) start_hot_reload(config_path, &config);
 
-    if (bind(server.socket, (struct sockaddr*)&server.address, sizeof(server.address)) < 0) {
-        perror("Bind failed"); return 1;
-    }
-
-    if (listen(server.socket, server.backlog) < 0) {
-        perror("Listen failed"); return 1;
-    }
-
-    // Launch server
-    server.launch(&server);
+    // launch server loop
+    launch_server_with(&server);
 
     return 0;
 }

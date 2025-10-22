@@ -1,7 +1,7 @@
 #ifndef HEADERS_H
 #define HEADERS_H
+#include <stdlib.h>
 
-void add_cors_and_custom_headers(int client_socket);
+void add_common_headers(char* buf, size_t buf_len);
 
 #endif
-

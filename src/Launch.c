@@ -1,64 +1,71 @@
 #include "../include/Launch.h"
 #include "../include/Request.h"
 #include "../include/Response.h"
-#include "../include/Server.h"
 #include "../include/Config.h"
+#include "../include/Router.h"
+#include <pthread.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <pthread.h>
 #include <arpa/inet.h>
 
-#define BUFFER_SIZE 2048
+extern struct ServerConfig* g_config_pointer; // not used; we'll pass via server
 
-struct ServerConfig* global_config; // used by threads
-
-void* handle_client(void* arg) {
+void* client_thread(void* arg) {
     int client_socket = *(int*)arg;
     free(arg);
 
-    char buffer[BUFFER_SIZE];
-    int read_size = read(client_socket, buffer, sizeof(buffer) - 1);
+    char buffer[8192];
+    int r = read(client_socket, buffer, sizeof(buffer)-1);
+    if (r <= 0) { close(client_socket); return NULL; }
+    buffer[r]=0;
 
-    if (read_size > 0) {
-        buffer[read_size] = '\0';
-        struct HttpRequest request = parse_request(buffer);
+    struct HttpRequest req = parse_request(buffer);
+    printf("Request: %s %s Host:%s\n", req.method, req.path, req.host);
 
-        printf("Received request:\nMethod: %s, Path: %s, Host: %s\n",
-               request.method, request.path, request.host);
+    // determine site root
+    // server pointer will be passed via global in main; to keep code simple we will
+    // read host → get site root via global config pointer stored in Launch.c
+    extern struct ServerConfig* launch_config;
+    const char* root = get_site_root(launch_config, req.host);
 
-        // API or static
-        if (strncmp(request.path, "/api/", 5) == 0) {
-            handle_api_request(client_socket, &request);
-        } else {
-            const char* www_root = get_site_root(global_config, request.host);
-            serve_response(client_socket, &request, www_root, global_config->spa_mode);
+    // If path starts with /api, dispatch router
+    if (strncmp(req.path, "/api/", 5) == 0) {
+        if (!handle_api_route(client_socket, &req, launch_config)) {
+            // not found
+            const char* nf = "{\"error\":\"API Not Found\"}";
+            send_response(client_socket, 404, "application/json", nf, strlen(nf));
         }
+    } else {
+        // static
+        bool spa = true;
+        // find spa mode for this host
+        for (int i=0;i<launch_config->site_count;i++) {
+            if (strcmp(launch_config->sites[i].host, req.host)==0) { spa = launch_config->sites[i].spa_mode; break;}
+        }
+        serve_response(client_socket, &req, root, spa);
     }
 
     close(client_socket);
-    printf("Client disconnected\n");
     return NULL;
 }
 
-void launch_server(struct Server *server) {
-    global_config = server->config;
+// global pointer used by Launch to let client threads access config
+struct ServerConfig* launch_config = NULL;
 
-    printf("Server listening on port %d...\n", server->port);
-
+void launch_server_with(struct Server* server) {
+    launch_config = server->config;
     while (1) {
-        int client_socket = accept(server->socket, NULL, NULL);
+        int client_socket = accept(server->socket_fd, NULL, NULL);
         if (client_socket < 0) {
-            perror("Failed to accept client");
+            perror("accept");
             continue;
         }
-        printf("Client Connected!\n");
-
-        pthread_t thread_id;
-        int *pclient = malloc(sizeof(int));
-        *pclient = client_socket;
-        pthread_create(&thread_id, NULL, handle_client, pclient);
-        pthread_detach(thread_id);
+        int *p = malloc(sizeof(int));
+        *p = client_socket;
+        pthread_t tid;
+        pthread_create(&tid, NULL, client_thread, p);
+        pthread_detach(tid);
     }
 }

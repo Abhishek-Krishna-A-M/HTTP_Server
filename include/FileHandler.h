@@ -2,18 +2,11 @@
 #define FILEHANDLER_H
 
 #include <stdbool.h>
-#include <stddef.h>
+#include <stdlib.h>
 
-#define MAX_PATH_LEN 512
-
-// Detect MIME type based on file extension
-const char* get_mime_type(const char* path);
-
-// Check if file exists
 bool file_exists(const char* path);
-
-// Read file content into buffer (returns size)
-size_t read_file(const char* path, char** buffer);
+size_t read_file(const char* path, char** out_buffer);
+const char* get_mime_type(const char* path);
+const char* generate_etag(const char* path);
 
 #endif
-

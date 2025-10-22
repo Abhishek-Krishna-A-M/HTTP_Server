@@ -1,40 +1,46 @@
 #include "../include/Server.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <errno.h>
 
-struct Server server_constructor(int domain, int service, int protocol, u_long interface, int port, int backlog, void (*launch)(struct Server *server)) {
+struct Server server_constructor(int port, int backlog, struct ServerConfig* config) {
     struct Server server;
-
-    server.domain = domain;
-    server.service = service;
-    server.protocol = protocol;
-    server.interface = interface;
     server.port = port;
     server.backlog = backlog;
+    server.config = config;
 
-    server.address.sin_family = domain;
+    server.socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server.socket_fd < 0) {
+        perror("socket");
+        exit(1);
+    }
+
+    int opt = 1;
+    if (setsockopt(server.socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("setsockopt");
+        close(server.socket_fd);
+        exit(1);
+    }
+
+    server.address.sin_family = AF_INET;
+    server.address.sin_addr.s_addr = INADDR_ANY;
     server.address.sin_port = htons(port);
-    server.address.sin_addr.s_addr = htonl(interface);
 
-    server.socket = socket(domain, service, protocol);
-    if (server.socket < 0) {
-        perror("Failed to create socket");
+    if (bind(server.socket_fd, (struct sockaddr*)&server.address, sizeof(server.address)) < 0) {
+        perror("bind");
+        close(server.socket_fd);
         exit(1);
     }
 
-    if (bind(server.socket, (struct sockaddr *)&server.address, sizeof(server.address)) < 0) {
-        perror("Failed to bind socket");
+    if (listen(server.socket_fd, backlog) < 0) {
+        perror("listen");
+        close(server.socket_fd);
         exit(1);
     }
 
-    if (listen(server.socket, server.backlog) < 0) {
-        perror("Failed to listen on socket");
-        exit(1);
-    }
-
-    server.launch = launch;
-
+    printf("Server listening on port %d\n", port);
     return server;
 }
